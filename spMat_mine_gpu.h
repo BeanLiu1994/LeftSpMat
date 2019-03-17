@@ -16,6 +16,6 @@ protected:
 public:
 	spMat_mine_gpu(const std::vector<std::tuple<int, int, vType>>& data, int rows, int cols);
 	virtual void assign(const std::vector<std::tuple<int, int, vType>>& data, int rows, int cols) override;
-	virtual std::vector<vType> MatMul(const std::vector<vType>& vec) override;
+	virtual std::vector<vType> MatMul(const std::vector<vType>& b_vec) override;
 	virtual ~spMat_mine_gpu() override;
 };

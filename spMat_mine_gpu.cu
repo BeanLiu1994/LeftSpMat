@@ -1,23 +1,27 @@
 #include "spMat_mine_gpu.h"
 #include <cuda_runtime.h>
+#include <device_launch_parameters.h>
 #include <cassert>
 
 const static int blockSize = 256;
 
 __global__ void spmat_mul_vec(vType* d_result,
-	const int* d_OuterStarts, const int* d_ColIndices, const vType* d_Values, const vType* d_vec, const int rows)
+	const int* d_OuterStarts, const int* d_ColIndices, const vType* d_Values, const vType* d_vec,
+	const int rows, const int b_rows)
 {
-	unsigned int row_idx = blockIdx.x * blockDim.x + threadIdx.x; 
+	unsigned int row_idx = blockIdx.x * blockDim.x + threadIdx.x;
+	unsigned int offset = threadIdx.y * b_rows;
 	if (row_idx >= rows)
 	{
 		return;
 	}
 
-	d_result[row_idx] = 0;
+	vType tmp_val = 0;
 	for (int ith_elem = d_OuterStarts[row_idx]; ith_elem < d_OuterStarts[row_idx + 1]; ++ith_elem)
 	{
-		d_result[row_idx] += d_Values[ith_elem] * d_vec[d_ColIndices[ith_elem]];
+		tmp_val += d_Values[ith_elem] * d_vec[d_ColIndices[ith_elem] + offset];
 	}
+	d_result[row_idx + offset] = tmp_val;
 }
 
 // 建议做个智能指针之类的存，那样的话出异常大概可能也许会比较安全
@@ -45,22 +49,24 @@ void spMat_mine_gpu::assign(const std::vector<std::tuple<int, int, vType>>& data
 
 std::vector<vType> spMat_mine_gpu::MatMul(const std::vector<vType>& vec)
 {
-	assert(vec.size() == Cols);
+	assert(vec.size() % Cols == 0);
+	int b_cols = vec.size() / Cols;
 	vType* d_result, *d_vec;
 
 	cudaMalloc(&d_vec, vec.size() * sizeof(vType));
 	cudaMemcpy(d_vec, vec.data(), vec.size() * sizeof(vType), cudaMemcpyHostToDevice);
 
-	cudaMalloc(&d_result, Cols * sizeof(vType));
+	cudaMalloc(&d_result, vec.size() * sizeof(vType));
 
+	// 共有 Rows*b_cols 个任务
 	int numThreads = std::min(blockSize, Rows);
 	int numBlocks = (Rows % numThreads != 0) ? (Rows / numThreads + 1) : (Rows / numThreads);
 
-	dim3 grid(numBlocks, 1, 1), block(numThreads, 1, 1);
-	spmat_mul_vec << <grid, block >> > (d_result, _d_OuterStarts, _d_ColIndices, _d_Values, d_vec, Rows);
+	dim3 grid(numBlocks, 1, 1), block(numThreads, b_cols, 1);
+	spmat_mul_vec << <grid, block >> > (d_result, _d_OuterStarts, _d_ColIndices, _d_Values, d_vec, Rows, Cols);
 
-	std::vector<vType> ret(Cols);
-	cudaMemcpy(ret.data(), d_result, Cols * sizeof(vType), cudaMemcpyDeviceToHost);
+	std::vector<vType> ret(vec.size());
+	cudaMemcpy(ret.data(), d_result, vec.size() * sizeof(vType), cudaMemcpyDeviceToHost);
 
 	cudaFree(d_vec);
 	cudaFree(d_result);

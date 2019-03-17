@@ -13,13 +13,14 @@ void spMat_check::assign(const std::vector<std::tuple<int, int, vType>>& data, i
 	A.setFromTriplets(A_data.begin(), A_data.end());
 	A.makeCompressed();
 }
-std::vector<vType> spMat_check::MatMul(const std::vector<vType>& vec)
+std::vector<vType> spMat_check::MatMul(const std::vector<vType>& b_vec)
 {
-	assert(A.cols() == vec.size());
-	Eigen::Map<const Eigen::Matrix<vType, -1, 1>> b(vec.data(), vec.size());
-	Eigen::Matrix<vType, -1, 1> tmp = A * b;
-	std::vector<vType> ret(vec.size());
-	for (int i = 0; i < vec.size(); ++i)
+	assert(b_vec.size() % A.cols() == 0);
+	int b_cols = b_vec.size() / A.cols();
+	Eigen::Map<const Eigen::Matrix<vType, -1, -1>> b(b_vec.data(), A.cols(), b_cols);
+	Eigen::Matrix<vType, -1, -1> tmp = A * b;
+	std::vector<vType> ret(b_vec.size());
+	for (int i = 0; i < b_vec.size(); ++i)
 	{
 		ret[i] = tmp(i);
 	}

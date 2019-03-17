@@ -1,6 +1,8 @@
 #include "spMat_mine_cpu.h"
 #include <cassert>
 #include <map>
+//#include <chrono>
+//#include <iostream>
 
 spMat_mine::spMat_mine(const std::vector<std::tuple<int, int, vType>>& data, int rows, int cols)
 {
@@ -46,17 +48,27 @@ void spMat_mine::assign(const std::vector<std::tuple<int, int, vType>>& data, in
 	Cols = cols;
 }
 
-std::vector<vType> spMat_mine::MatMul(const std::vector<vType>& vec)
+std::vector<vType> spMat_mine::MatMul(const std::vector<vType>& b_vec)
 {
-	assert(vec.size() == Cols);
-	std::vector<vType> result(Cols, 0);
-	for (int ith_row = 0; ith_row < Rows; ++ith_row)
+	assert(b_vec.size() % Cols == 0);
+	int b_cols = b_vec.size() / Cols;
+	std::vector<vType> result(Cols * b_cols, 0);
+	//auto start = std::chrono::steady_clock::now();
+	// b取一列出来
+	for (int ith_b_col = 0; ith_b_col < b_cols; ++ith_b_col)
 	{
-		// 一行乘一列, 只乘稀疏部分。
-		for (int ith_elem = OuterStarts[ith_row]; ith_elem < OuterStarts[ith_row + 1]; ++ith_elem)
+		int offset = ith_b_col * Cols;
+		// A取一行出来
+		for (int ith_row = 0; ith_row < Rows; ++ith_row)
 		{
-			result[ith_row] += Values[ith_elem] * vec[ColIndices[ith_elem]];
+			// 一行乘一列, 只乘稀疏部分。
+			for (int ith_elem = OuterStarts[ith_row]; ith_elem < OuterStarts[ith_row + 1]; ++ith_elem)
+			{
+				result[ith_row + offset] += Values[ith_elem] * b_vec[ColIndices[ith_elem] + offset];
+			}
 		}
 	}
+	//auto end = std::chrono::steady_clock::now();
+	//std::cout << (end - start).count() / 1e6 << std::endl;
 	return result;
 }
