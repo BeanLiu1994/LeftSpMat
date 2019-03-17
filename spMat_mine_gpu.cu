@@ -62,6 +62,8 @@ std::vector<vType> spMat_mine_gpu::MatMul(const std::vector<vType>& vec)
 	std::vector<vType> ret(Cols);
 	cudaMemcpy(ret.data(), d_result, Cols * sizeof(vType), cudaMemcpyDeviceToHost);
 
+	cudaFree(d_vec);
+	cudaFree(d_result);
 	CudaCheck();
 	return ret;
 }
